@@ -1,0 +1,720 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="./sproject_html.xsl"?>
+<!DOCTYPE sproject SYSTEM "sproject.dtd">
+<sproject>
+    <course database="Oracle" version="11">
+        <cname>Databázové systémy</cname>
+            <code>BI-DBS.21</code>
+            <semester>B242</semester>
+            <seminar>Čtvrtek 14:30, Lichý týden, paralelka 1250788078705</seminar>
+    </course>
+        <author>
+            <aname>Anh Quan To</aname>
+            <uname>toanhqua</uname>
+            <email>toanhqua@fit.cvut.cz</email>
+        </author>
+    <content>
+        <declaration>I declare that I have developed my semestral work independently. All the sources I used are listed in the section References.</declaration>
+            <title>Služba pro sdílené uložiště filmů</title>
+        <description>
+            <title>Popis</title>
+                    <para>Máme službu fungující na hraně zákona. Tato služba poskytuje přístup k **filmům**, které lze rozdělit podle *žánru*, *země* a *roku vydání*. Pro využívání služby se ale každý musí nejprve zaregistrovat a stát se **uživatelem** s unikátní přezdívkou, kterou již poté není možné změnit. Jednotlivé filmy mohou mít **uploady**, a každý upload má unikátní *identifikační číslo* a lze je třídit i dle *velikosti* či *kvality*. Každý uživatel může přidávat uploady k jednotlivým filmům.</para>
+                    <para></para>
+                    <para>V databázi nalezneme všechny uskutečněné **události** spojené s uploady. Každá událost může být buď  **zhlédnutí** , nebo **stahování** , a to je vše i s *dobou trvání události* zaznamenáváno.</para>
+                    <para>Aby mohla být služba finančně zajištěna, tak mimo prodávání dat o uživatelích plynou peníze i z prodeje **předplatného** uživatelů služby. Jednotlivá předplatná jsou vždy aktivní pouze pro jeden účet a mají omezenou platnost. Bez předplatného nemohou uživatelé sledovat nebo stahovat filmy. Výjimku tvoři uživatelé, kteří v minulosti přidali alespoň jeden upload libovolného filmu.</para>
+                    <para></para>
+                    <para>Protože uploadovat obsah může každý, je potřeba dohlédnout na neporušování podmínek služby. Někdo se také musí starat o případné mazání či úpravy obsahu. Pro tyto účely existují **moderátoři**, což jsou uživatelé s většími pravomocemi a možnostmi. Také mohou samozřejmě sledovat a stahovat filmy bez předplatného. Tito vybraní uživatelé mohou taktéž kvůli porušování pravidel zablokovat uživateli účet na určitou dobu. U nich evidujeme začátek působení a v některých případech i stát.</para>
+        </description>
+        <data_model>
+            <title>Conceptual schema</title>
+            <dm_picture>
+                <mediaobject>
+                    <imageobject>
+                        <imagedata fileref="conceptual_schema.png"/>
+                    </imageobject>
+                </mediaobject>
+            </dm_picture>
+            <dm_discussion>
+                        <para>Smyčka **User-Event-Upload**: User může zhlédnout nebo stáhnout vlastní upload, to problém není.</para>
+                        <para>Smyčka **User-Moderator-Ban**: Mohlo by dojít k tomu, že by uživatel jako moderátor udělil ban sám sobě. Zavedeno IO1, abychom tomuto zamezili.</para>
+                        <para></para>
+            </dm_discussion>
+        </data_model>
+        <relational_model>
+            <title>Relační schema</title>
+            <rm_picture>
+                <mediaobject>
+                    <imageobject>
+                        <imagedata fileref="relational_schema.png"/>
+                    </imageobject>
+                </mediaobject>
+            </rm_picture>
+        </relational_model>
+        <queries>
+            <title>Dotazy</title>
+            <dotazy>
+                    <dotaz dotaz_id="D1">
+                        <popis_dotazu>
+                                <para>Kolik je minimální počet uploadů k tomu, aby každý uživatel měl alespoň jeden upload ke každému filmu?</para>
+                        </popis_dotazu>
+                            <sql>SELECT COUNT(*) as pocetuploadu
+FROM film CROSS JOIN service_user;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D3">
+                        <popis_dotazu>
+                                <para>Vypiš všechny atributy u downloadů uploadu s kvalitou 1080p</para>
+                        </popis_dotazu>
+                            <relacni_algebra>{upload(quality=&apos;FullHD&apos;)[upload.id_upload=event.id_upload&gt;event}[event.id_event=download.id_event&gt;download</relacni_algebra>
+                            <sql>SELECT download.*
+FROM upload join event using (id_upload) join download using (id_event)
+WHERE quality = &apos;FullHD&apos;;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D4">
+                        <popis_dotazu>
+                                <para>Vypiš všechny uživatele, kteří vytvořili všechny uploady k filmu s identifikátorem 3.</para>
+                        </popis_dotazu>
+                            <relacni_algebra>{upload[id_user,id_upload]÷upload(id_film=&apos;3&apos;)[id_upload]}*service_user</relacni_algebra>
+                            <sql>SELECT *
+FROM service_user
+WHERE (SELECT COUNT(DISTINCT id_upload) FROM upload WHERE id_film = &apos;3&apos;)
+          =
+      (SELECT COUNT(DISTINCT id_upload) FROM upload WHERE id_film = &apos;3&apos; and upload.id_user = service_user.id_user);</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D5">
+                        <popis_dotazu>
+                                <para>Vypiš eventy pouze dne 05.02.2023.</para>
+                        </popis_dotazu>
+                            <relacni_algebra>event(date=&apos;2023-02-05&apos;)</relacni_algebra>
+                            <sql>SELECT *
+FROM EVENT
+WHERE date = &apos;2023-02-05&apos;;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D6">
+                        <popis_dotazu>
+                                <para>Vypiš uživatele, kteří nemají ban.</para>
+                        </popis_dotazu>
+                            <relacni_algebra>ban!*&gt;service_user</relacni_algebra>
+                            <sql>SELECT *
+FROM SERVICE_USER
+where not exists (SELECT *
+                  FROM ban
+                  where service_user.id_user = ban.id_user);</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D7">
+                        <popis_dotazu>
+                                <para>Vypiš filmové žánry, které mají filmy s uploady, jejichž kvalita je 4K. Výsledek seřaď sestupně</para>
+                        </popis_dotazu>
+                            <sql>--prvni varianta
+SELECT film.genre
+FROM film
+where exists (select 1
+              from upload
+              where film.id_film = upload.id_film
+                and quality = &apos;4K&apos;)
+order by film.genre asc;
+--druha varianta
+SELECT film.genre
+FROM film
+where film.id_film in  (select distinct id_film
+              from upload
+              where quality = &apos;4K&apos;)
+order by film.genre asc;
+--treti
+SELECT distinct film.genre
+FROM film join upload on film.id_film = upload.id_film
+where quality = &apos;4K&apos;
+order by film.genre asc;
+                
+</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D12">
+                        <popis_dotazu>
+                                <para>Jaké jsou nejstarší události u každého uploadu, u kterého došlo aspoň ke 2 událostem a má kvalitu FullHD? Výstup seřaď vzestupně podle nejstarší události.</para>
+                        </popis_dotazu>
+                            <sql>SELECT upload.*, MIN(date) as nejstarsi_udalost
+from event
+         join upload on upload.id_upload = event.id_upload
+where quality = &apos;FullHD&apos;
+group by upload.id_upload
+having count(id_event) &gt;= 2
+order by nejstarsi_udalost asc;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D13">
+                        <popis_dotazu>
+                                <para>Vypiš přezdívku všech uživatelů a jejich poslední ban. Pokud nikdy uživatel ban neměl, bude ve výpisu NENI.
+</para>
+                        </popis_dotazu>
+                            <sql>SELECT service_user.nickname, COALESCE(TO_CHAR(MIN(ban.date), &apos;yyyy-mm-dd&apos;), &apos;NENI&apos;) as posledni_ban
+from service_user
+         left join ban on service_user.id_user = ban.id_user
+group by service_user.id_user;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D14">
+                        <popis_dotazu>
+                                <para>Vyber všechny filmy (název a datum vydání), uploady (id a kvalitu) a uživatele (přezdívku) tak, aby šlo vidět, kdo nahrál jaký upload a o jaký film se jedná. Zároveň budou ve výpisu i filmy a uživatelé bez uploadů.
+</para>
+                        </popis_dotazu>
+                            <sql>begin;
+insert into film (name, genre, country, release_date)
+values (&apos;Bratrstvo sigma&apos;, &apos;Drama&apos;, &apos;Slovensko&apos;, to_date(&apos;2023-04-15&apos;, &apos;YYYY-MM-DD&apos;));
+insert into service_user (registration_date, nickname)
+values (to_date(&apos;2023-02-15&apos;, &apos;YYYY-MM-DD&apos;), &apos;Frajer222&apos;);
+SELECT film.name, film.release_date, upload.id_upload, upload.quality, service_user.nickname
+from film
+         left join upload on film.id_film = upload.id_film
+         full outer join service_user on upload.id_user = service_user.id_user;
+rollback;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D15">
+                        <popis_dotazu>
+                                <para>Vytvoř pohled s předplatnými, které končí mezi daty 1. 1. 2022 a 1. 6. 2025 a změň je na datum 8. 5. 2025
+</para>
+                        </popis_dotazu>
+                            <sql>CREATE OR REPLACE VIEW vyprselo as
+(
+SELECT *
+from subscription
+where end_date between &apos;2022-01-01&apos; and &apos;2025-06-01&apos;
+
+    );
+
+begin;
+update vyprselo
+set end_date=to_date(&apos;2025-05-08&apos;, &apos;YYYY-MM-DD&apos;);
+select *
+from vyprselo;
+rollback;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D16">
+                        <popis_dotazu>
+                                <para>Vlož nového moderátora, kterým bude nejnovější uživatel. Moderátor začne pracovat od 25. 2. 2026.
+</para>
+                        </popis_dotazu>
+                            <sql>begin;
+insert into moderator (id_user, start_date)
+select id_user, start_date
+from (select id_user, to_date(&apos;2026-05-25&apos;, &apos;YYYY-MM-DD&apos;) as start_date
+      from service_user
+      order by registration_date desc) vstup
+limit 1;
+select *
+from moderator;
+rollback;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D17">
+                        <popis_dotazu>
+                                <para>Uživatelům, kterým končí předplatné 30. 11. 2024 změň konec na 1. 12. 2024. Vypiš přezdívky všech uživatelů a nové data konce předplatného.
+</para>
+                        </popis_dotazu>
+                            <sql>--původní
+select service_user.nickname, subscription.end_date
+from service_user
+         join subscription using (id_user);
+--dotaz
+begin;
+update subscription
+set end_date=to_date(&apos;2024-12-01&apos;, &apos;YYYY-MM-DD&apos;)
+where id_user in (select service_user.id_user
+                  from service_user
+                           join subscription using (id_user)
+                  where end_date = to_date(&apos;2024-11-30&apos;, &apos;YYYY-MM-DD&apos;));
+select service_user.nickname, subscription.end_date
+from service_user
+         join subscription using (id_user);
+rollback;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D18">
+                        <popis_dotazu>
+                                <para>Odstraň filmy, které nemají žádný upload.
+</para>
+                        </popis_dotazu>
+                            <sql>begin;
+
+insert into film (name, genre, country, release_date)
+values (&apos;Avengers 18&apos;, &apos;Drama&apos;, &apos;Slovensko&apos;, to_date(&apos;2027-04-15&apos;, &apos;YYYY-MM-DD&apos;));
+select *
+from film;
+delete
+from film
+where id_film in (select id_film
+                  from film
+                  except
+                  select id_film
+                  from film
+                           join upload using (id_film));
+select *
+from film;
+rollback;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D19">
+                        <popis_dotazu>
+                                <para>Kontrola dotazu kategorie D1</para>
+                        </popis_dotazu>
+                            <sql>select id_upload
+from upload
+where id_film = 3
+except
+select id_upload
+from upload
+         join service_user using (id_user)
+where id_user in (SELECT id_user
+                  FROM service_user
+                  WHERE (SELECT COUNT(DISTINCT id_upload) FROM upload WHERE id_film = &apos;3&apos;)
+                            =
+                        (SELECT COUNT(DISTINCT id_upload)
+                         FROM upload
+                         WHERE id_film = &apos;3&apos;
+                           and upload.id_user = service_user.id_user));</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D20">
+                        <popis_dotazu>
+                                <para>Vypiš všechny uživatele a příslušný počet stažení.
+</para>
+                        </popis_dotazu>
+                            <sql>SELECT *,
+       (SELECT count(*)
+        FROM event
+                 join download using (id_event)
+        where service_user.id_user = event.id_user) AS pocet_stazeni
+FROM service_user;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D21">
+                        <popis_dotazu>
+                                <para>Vyber uživatele, kteří jsou buď moderátory, nebo mají předplatné (nesmí platit oboje).</para>
+                        </popis_dotazu>
+                            <relacni_algebra>{{moderator[moderator.id_user=service_user.id_user]service_user}[id_user,registration_date,nickname]
+∪
+{subscription[subscription.id_user=service_user.id_user]service_user}[id_user,registration_date,nickname]}
+\
+{moderator[moderator.id_user=service_user.id_user]service_user}[id_user,registration_date,nickname]
+∩
+{subscription[subscription.id_user=service_user.id_user]service_user}[id_user,registration_date,nickname]</relacni_algebra>
+                            <sql>(select service_user.*
+ from moderator
+          join service_user using (id_user)
+ union
+ select service_user.*
+ from subscription
+          join service_user using (id_user))
+except
+(select service_user.*
+ from moderator
+          join service_user using (id_user)
+ intersect
+ select service_user.*
+ from subscription
+          join service_user using (id_user))</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D22">
+                        <popis_dotazu>
+                                <para>Vypiš uploady, které byly nahrány moderátory a jejich kvalita je HD nebo 4K.</para>
+                        </popis_dotazu>
+                            <relacni_algebra>{moderator[moderator.id_user=upload.id_user&gt;upload}(quality=&apos;HD&apos; ∨ quality=&apos;4K&apos; )</relacni_algebra>
+                            <sql>select upload.*
+from upload
+         join moderator on moderator.id_user = upload.id_user
+where quality = &apos;4K&apos;
+   or quality = &apos;HD&apos;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D23">
+                        <popis_dotazu>
+                                <para>Vypiš přezdívky uživatelů, kteří neměli ban, ale měli předplatné.</para>
+                        </popis_dotazu>
+                            <relacni_algebra>{{ban!*&gt;service_user}[nickname]}
+∩
+{{subscription*&gt;service_user}[nickname]}</relacni_algebra>
+                            <sql>select nickname
+from service_user
+where not exists (select 1 from ban where ban.id_user = service_user.id_user)
+intersect
+select nickname
+from service_user
+where exists (select 1 from subscription where subscription.id_user = service_user.id_user);</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D24">
+                        <popis_dotazu>
+                                <para>Vypiš velikosti uploadů uživatelů, kteří obdrželi ban na delší dobu než 20 dní.</para>
+                        </popis_dotazu>
+                            <relacni_algebra>{ban(duration &gt; 20)[ban.id_user=upload.id_user&gt;upload}[size-&gt; velikost]</relacni_algebra>
+                            <sql>select distinct upload.size as velikost
+from upload
+         join ban using (id_user)
+where ban.duration &gt; 20;
+</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D25">
+                        <popis_dotazu>
+                                <para>Vypiš přezdívky a datum registrace uživatelů, kteří nahráli uploady slovenských filmů.</para>
+                        </popis_dotazu>
+                            <relacni_algebra>{{film(country=&apos;Slovensko&apos;)[film.id_film=upload.id_film&gt;upload}[upload.id_user=service_user.id_user&gt;service_user}[nickname, registration_date]</relacni_algebra>
+                            <sql>select nickname, registration_date
+from film
+         join upload using (id_film)
+         join service_user using (id_user)
+where film.country = &apos;Slovensko&apos;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D26">
+                        <popis_dotazu>
+                                <para>Vypiš uploady u filmů, které vyšly mezi daty 1. 3. 2022 a 15. 1. 2023</para>
+                        </popis_dotazu>
+                            <relacni_algebra>film(release_date&gt;=&apos;2022-03-01&apos; ∧ release_date&lt;=&apos;2023-01-15&apos;)[film.id_film=upload.id_film&gt;upload</relacni_algebra>
+                            <sql>SELECT upload.*
+FROM UPLOAD join film using (id_film)
+WHERE film.release_date &gt;= to_date(&apos;2022-03-01&apos;, &apos;YYYY-MM-DD&apos;) and film.release_date &lt;= to_date(&apos;2023-01-15&apos;, &apos;YYYY-MM-DD&apos;)
+;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D27">
+                        <popis_dotazu>
+                                <para>Seřaď uživatele primárně podle počtu uploadů sestupně, sekundárně podle registračního data vzestupně.</para>
+                        </popis_dotazu>
+                            <sql>select service_user.*, (select count(*) from upload where upload.id_user = service_user.id_user) as pocet_uploadu
+from service_user
+order by pocet_uploadu desc, registration_date asc;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D28">
+                        <popis_dotazu>
+                                <para>Pro každou zemi najdi datum vydání nejstaršího filmu z této země.</para>
+                        </popis_dotazu>
+                            <sql>select country, MIN(release_date) as nejstarsi_film
+from film
+group by film.country</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D29">
+                        <popis_dotazu>
+                                <para>Vypiš moderátory a jejich počet vydaných banů. Seřaď je sestupně podle počtu.
+</para>
+                        </popis_dotazu>
+                            <sql>select moderator.*, count(*) as pocet
+from moderator
+         join ban on moderator.id_user = ban.moderator_id_user
+group by moderator.id_user
+order by pocet desc;</sql>
+                    </dotaz>
+                    <dotaz dotaz_id="D30">
+                        <popis_dotazu>
+                                <para>Vypiš přezdívky uživatelů, kteří dostali ban 5. 2. 2024</para>
+                        </popis_dotazu>
+                            <sql>select nickname
+from service_user
+where id_user in (select id_user from ban where ban.date = to_date(&apos;2024-02-05&apos;, &apos;YYYY-MM-DD&apos;))</sql>
+                    </dotaz>
+            </dotazy>
+            <pokryti_dotazu>
+                        <radek>
+                            <kategorie>A</kategorie>
+                            <odkazy>
+                                    <link url="#D3">D3</link>
+                                    <link url="#D7">D7</link>
+                                    <link url="#D12">D12</link>
+                                    <link url="#D13">D13</link>
+                                    <link url="#D14">D14</link>
+                                    <link url="#D17">D17</link>
+                                    <link url="#D18">D18</link>
+                                    <link url="#D19">D19</link>
+                                    <link url="#D20">D20</link>
+                                    <link url="#D21">D21</link>
+                                    <link url="#D22">D22</link>
+                                    <link url="#D24">D24</link>
+                                    <link url="#D25">D25</link>
+                                    <link url="#D26">D26</link>
+                                    <link url="#D29">D29</link>
+                            </odkazy>
+                            <kategorie_popis>A - Pozitivní dotaz nad spojením alespoň dvou tabulek</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>AR</kategorie>
+                            <odkazy>
+                                    <link url="#D3">D3</link>
+                                    <link url="#D21">D21</link>
+                                    <link url="#D22">D22</link>
+                                    <link url="#D24">D24</link>
+                                    <link url="#D25">D25</link>
+                                    <link url="#D26">D26</link>
+                            </odkazy>
+                            <kategorie_popis>A (RA) - Pozitivní dotaz nad spojením alespoň dvou tabulek</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>B</kategorie>
+                            <odkazy>
+                                    <link url="#D6">D6</link>
+                            </odkazy>
+                            <kategorie_popis>B - Negativní dotaz nad spojením alespoň dvou tabulek</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>C</kategorie>
+                            <odkazy>
+                                    <link url="#D5">D5</link>
+                            </odkazy>
+                            <kategorie_popis>C - Vyber ty, kteří mají vztah POUZE k ...</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>D1</kategorie>
+                            <odkazy>
+                                    <link url="#D4">D4</link>
+                            </odkazy>
+                            <kategorie_popis>D1 - Vyber ty, kteří/které jsou ve vztahu se všemi - dotaz s univerzální kvantifikací</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>D2</kategorie>
+                            <odkazy>
+                                    <link url="#D19">D19</link>
+                            </odkazy>
+                            <kategorie_popis>D2 - Kontrola výsledku dotazu z kategorie D1</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>F1</kategorie>
+                            <odkazy>
+                                    <link url="#D7">D7</link>
+                                    <link url="#D12">D12</link>
+                                    <link url="#D22">D22</link>
+                                    <link url="#D29">D29</link>
+                            </odkazy>
+                            <kategorie_popis>F1 - JOIN ON</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>F1R</kategorie>
+                            <odkazy>
+                                    <link url="#D22">D22</link>
+                            </odkazy>
+                            <kategorie_popis>F1 (RA) - JOIN ON</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>F2</kategorie>
+                            <odkazy>
+                                    <link url="#D3">D3</link>
+                                    <link url="#D17">D17</link>
+                                    <link url="#D18">D18</link>
+                                    <link url="#D19">D19</link>
+                                    <link url="#D20">D20</link>
+                                    <link url="#D21">D21</link>
+                                    <link url="#D24">D24</link>
+                                    <link url="#D25">D25</link>
+                                    <link url="#D26">D26</link>
+                            </odkazy>
+                            <kategorie_popis>F2 - NATURAL JOIN|JOIN USING</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>F2R</kategorie>
+                            <odkazy>
+                                    <link url="#D3">D3</link>
+                                    <link url="#D21">D21</link>
+                                    <link url="#D24">D24</link>
+                                    <link url="#D25">D25</link>
+                                    <link url="#D26">D26</link>
+                            </odkazy>
+                            <kategorie_popis>F2 (RA) - NATURAL JOIN|JOIN USING</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>F3</kategorie>
+                            <odkazy>
+                                    <link url="#D1">D1</link>
+                            </odkazy>
+                            <kategorie_popis>F3 - CROSS JOIN</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>F4</kategorie>
+                            <odkazy>
+                                    <link url="#D13">D13</link>
+                                    <link url="#D14">D14</link>
+                            </odkazy>
+                            <kategorie_popis>F4 - LEFT|RIGHT OUTER JOIN</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>F5</kategorie>
+                            <odkazy>
+                                    <link url="#D14">D14</link>
+                            </odkazy>
+                            <kategorie_popis>F5 - FULL (OUTER) JOIN</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>G1</kategorie>
+                            <odkazy>
+                                    <link url="#D4">D4</link>
+                                    <link url="#D6">D6</link>
+                                    <link url="#D7">D7</link>
+                                    <link url="#D17">D17</link>
+                                    <link url="#D18">D18</link>
+                                    <link url="#D19">D19</link>
+                                    <link url="#D23">D23</link>
+                                    <link url="#D30">D30</link>
+                            </odkazy>
+                            <kategorie_popis>G1 - Vnořený dotaz v klauzuli WHERE</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>G1R</kategorie>
+                            <odkazy>
+                                    <link url="#D4">D4</link>
+                                    <link url="#D6">D6</link>
+                                    <link url="#D23">D23</link>
+                            </odkazy>
+                            <kategorie_popis>G1 (RA) - Vnořený dotaz v klauzuli WHERE</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>G2</kategorie>
+                            <odkazy>
+                                    <link url="#D16">D16</link>
+                            </odkazy>
+                            <kategorie_popis>G2 - Vnořený dotaz v klauzuli FROM</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>G3</kategorie>
+                            <odkazy>
+                                    <link url="#D20">D20</link>
+                                    <link url="#D27">D27</link>
+                            </odkazy>
+                            <kategorie_popis>G3 - Vnořený dotaz v klauzuli SELECT</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>G4</kategorie>
+                            <odkazy>
+                                    <link url="#D6">D6</link>
+                                    <link url="#D7">D7</link>
+                                    <link url="#D23">D23</link>
+                            </odkazy>
+                            <kategorie_popis>G4 - Vztažený vnořený dotaz (EXISTS, NOT EXISTS)</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>G4R</kategorie>
+                            <odkazy>
+                                    <link url="#D6">D6</link>
+                                    <link url="#D23">D23</link>
+                            </odkazy>
+                            <kategorie_popis>G4 (RA) - Vztažený vnořený dotaz (EXISTS, NOT EXISTS)</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>H1</kategorie>
+                            <odkazy>
+                                    <link url="#D21">D21</link>
+                            </odkazy>
+                            <kategorie_popis>H1 - Množinové sjednocení - UNION</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>H2</kategorie>
+                            <odkazy>
+                                    <link url="#D18">D18</link>
+                                    <link url="#D19">D19</link>
+                                    <link url="#D21">D21</link>
+                            </odkazy>
+                            <kategorie_popis>H2 - Množinový rozdíl - MINUS nebo EXCEPT</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>H2R</kategorie>
+                            <odkazy>
+                                    <link url="#D21">D21</link>
+                            </odkazy>
+                            <kategorie_popis>H2 (RA) - Množinový rozdíl - MINUS nebo EXCEPT</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>H3</kategorie>
+                            <odkazy>
+                                    <link url="#D21">D21</link>
+                                    <link url="#D23">D23</link>
+                            </odkazy>
+                            <kategorie_popis>H3 - Množinový průnik - INTERSECT</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>I1</kategorie>
+                            <odkazy>
+                                    <link url="#D1">D1</link>
+                                    <link url="#D4">D4</link>
+                                    <link url="#D12">D12</link>
+                                    <link url="#D13">D13</link>
+                                    <link url="#D19">D19</link>
+                                    <link url="#D20">D20</link>
+                                    <link url="#D27">D27</link>
+                                    <link url="#D28">D28</link>
+                                    <link url="#D29">D29</link>
+                            </odkazy>
+                            <kategorie_popis>I1 - Agregační funkce (count|sum|min|max|avg)</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>I1R</kategorie>
+                            <odkazy>
+                                    <link url="#D4">D4</link>
+                            </odkazy>
+                            <kategorie_popis>I1 (RA) - Agregační funkce (count|sum|min|max|avg)</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>I2</kategorie>
+                            <odkazy>
+                                    <link url="#D12">D12</link>
+                                    <link url="#D13">D13</link>
+                                    <link url="#D28">D28</link>
+                                    <link url="#D29">D29</link>
+                            </odkazy>
+                            <kategorie_popis>I2 - Agregační funkce nad seskupenými řádky - GROUP BY (HAVING)</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>J</kategorie>
+                            <odkazy>
+                                    <link url="#D7">D7</link>
+                            </odkazy>
+                            <kategorie_popis>J - Stejný dotaz ve třech různých formulacích SQL</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>K</kategorie>
+                            <odkazy>
+                                    <link url="#D12">D12</link>
+                            </odkazy>
+                            <kategorie_popis>K - Všechny klauzule v 1 dotazu - SELECT FROM WHERE GROUP BY HAVING ORDER BY</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>L</kategorie>
+                            <odkazy>
+                                    <link url="#D15">D15</link>
+                            </odkazy>
+                            <kategorie_popis>L - VIEW</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>M</kategorie>
+                            <odkazy>
+                                    <link url="#D15">D15</link>
+                            </odkazy>
+                            <kategorie_popis>M - Dotaz nad pohledem</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>N</kategorie>
+                            <odkazy>
+                                    <link url="#D16">D16</link>
+                            </odkazy>
+                            <kategorie_popis>N - INSERT, který vloží do některé tabulky množinu řádků, které jsou vybrány dotazem z vybraných tabulek (příkaz INSERT, ve kterém je klauzule VALUES nahrazena vnořeným poddotazem.</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>O</kategorie>
+                            <odkazy>
+                                    <link url="#D17">D17</link>
+                            </odkazy>
+                            <kategorie_popis>O - UPDATE s vnořeným SELECT příkazem</kategorie_popis>
+                        </radek>
+                        <radek>
+                            <kategorie>P</kategorie>
+                            <odkazy>
+                                    <link url="#D18">D18</link>
+                            </odkazy>
+                            <kategorie_popis>P - DELETE s vnořeným SELECT příkazem</kategorie_popis>
+                        </radek>
+            </pokryti_dotazu>
+        </queries>
+        <scripts>
+            <title>Scripts</title>
+            <para>
+                <link url="./create.sql">create.sql</link>
+            </para>
+            <para>
+                <link url="./insert.sql">insert.sql</link>
+            </para>
+        </scripts>
+        <conclussions>
+            <title>Závěr</title>
+                    <para>Jednalo se o můj první kontakt s relačními databázemi a mám za to, že jsem se o nich dost naučil. Měl jsem občas problém přecházet mezi čestinou (dotazy) a angličtinou (konceptuální schéma), zpětně jsem to měl celé udělat v češtině. Jinak jsem se nesetkal s žádnými technickými problémy. Semestrální práci jsem vytvářel dle mého úsudku přiměřenou dobu. Dokončil jsem ji v menším rozsahu, než jsem původně zamýšlel, což bylo způsobeno především ne zcela domyšleným konceptuálním schématem a z části také leností. </para>
+        </conclussions>
+        <references>
+            <title>Zdroje</title>
+                    <para>users.fit.cvut.cz/~hunkajir/dbs2/create.sql</para>
+                    <para>chatgpt.com</para>
+                    <para>gemini.com</para>
+                    <para>courses.fit.cvut.cz</para>
+                    <para>stackoverflow.com</para>
+        </references>
+    </content>
+</sproject>
